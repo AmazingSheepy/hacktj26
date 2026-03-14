@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no"/>
+<title>SeePath</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;700;800&display=swap');
+  :root{--bg:#050a0e;--surface:#0d1a22;--accent:#00e5ff;--red:#ff3d71;--green:#00ff88;--text:#e8f4f8;--muted:#4a7a8a;--border:#1a3040}
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  body{background:var(--bg);color:var(--text);font-family:'Space Mono',monospace;height:100dvh;display:flex;flex-direction:column;overflow:hidden}
+  body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(var(--border) 1px,transparent 1px),linear-gradient(90deg,var(--border) 1px,transparent 1px);background-size:40px 40px;opacity:0.28;pointer-events:none;z-index:0}
+
+  /* SETUP SCREEN */
+  .setup{position:fixed;inset:0;z-index:200;background:rgba(5,10,14,0.99);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;padding:32px 24px}
+  .setup.hidden{display:none}
+  .setup-logo{font-family:'Syne',sans-serif;font-weight:800;font-size:34px;color:var(--accent);text-shadow:0 0 30px rgba(0,229,255,0.6)}
+  .setup-logo span{color:var(--text)}
+  .setup-sub{font-size:11px;color:var(--muted);letter-spacing:1px;text-align:center;line-height:1.9}
+  .setup-input{width:100%;padding:14px 16px;background:var(--surface);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:'Space Mono',monospace;font-size:13px;outline:none}
+  .setup-input:focus{border-color:var(--accent)}
+  .setup-btn{width:100%;padding:16px;background:var(--accent);color:var(--bg);border:none;border-radius:8px;font-family:'Syne',sans-serif;font-weight:800;font-size:16px;cursor:pointer;letter-spacing:1px}
+  .setup-btn:active{opacity:0.85}
+  .setup-note{font-size:10px;color:var(--muted);text-align:center;line-height:1.8}
+
+  /* PERMISSION SCREEN */
+  .perm{position:fixed;inset:0;z-index:190;background:rgba(5,10,14,0.99);display:none;flex-direction:column;align-items:center;justify-content:center;gap:20px;padding:32px 24px;text-align:center}
+  .perm.show{display:flex}
+  .perm-icon{font-size:52px}
+  .perm-title{font-family:'Syne',sans-serif;font-weight:800;font-size:22px;color:var(--green)}
+  .perm-sub{font-size:12px;color:var(--muted);line-height:1.8;letter-spacing:0.5px}
+  .perm-btn{padding:16px 32px;background:var(--green);color:var(--bg);border:none;border-radius:8px;font-family:'Syne',sans-serif;font-weight:800;font-size:15px;cursor:pointer}
+  .perm-err{font-size:11px;color:var(--red);line-height:1.7;display:none}
+  .perm-err.show{display:block}
+
+  header{position:relative;z-index:10;display:flex;align-items:center;justify-content:space-between;padding:14px 20px;border-bottom:1px solid var(--border);background:rgba(5,10,14,0.95)}
+  .logo{font-family:'Syne',sans-serif;font-weight:800;font-size:20px;color:var(--accent);text-shadow:0 0 20px rgba(0,229,255,0.5)}
+  .logo span{color:var(--text)}
+  .pill{display:flex;align-items:center;gap:8px;font-size:10px;letter-spacing:1.5px;color:var(--muted);text-transform:uppercase}
+  .dot{width:8px;height:8px;border-radius:50%;background:var(--muted);transition:all 0.3s}
+  .dot.live{background:var(--accent);box-shadow:0 0 8px var(--accent);animation:bl 1.5s infinite}
+  .dot.ask{background:var(--green);box-shadow:0 0 10px var(--green);animation:bl 0.5s infinite}
+  .dot.think{background:var(--red);box-shadow:0 0 8px var(--red);animation:bl 0.4s infinite}
+  @keyframes bl{0%,100%{opacity:1}50%{opacity:0.1}}
+
+  .cam-wrap{position:relative;z-index:5;flex:1;overflow:hidden;background:#000}
+  #cam{width:100%;height:100%;object-fit:cover;display:block}
+  .ov{position:absolute;inset:0;pointer-events:none}
+  .bk{position:absolute;width:40px;height:40px;border-color:var(--accent);border-style:solid;opacity:0.6}
+  .tl{top:12px;left:12px;border-width:2px 0 0 2px}.tr{top:12px;right:12px;border-width:2px 2px 0 0}
+  .bl2{bottom:12px;left:12px;border-width:0 0 2px 2px}.br2{bottom:12px;right:12px;border-width:0 2px 2px 0}
+  .compass{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:110px;height:110px;border:1px solid rgba(0,229,255,0.1);border-radius:50%}
+  .cc{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:7px;height:7px;background:var(--accent);border-radius:50%;box-shadow:0 0 10px var(--accent)}
+  .cl{position:absolute;font-size:9px;color:rgba(0,229,255,0.35);transform:translate(-50%,-50%)}
+  .sl{position:absolute;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,var(--accent),transparent);top:0;opacity:0}
+  .sl.on{opacity:1;animation:sd 1.4s linear infinite}
+  @keyframes sd{from{top:0}to{top:100%}}
+  .pr{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:150px;height:150px;border-radius:50%;border:2px solid var(--accent);opacity:0;pointer-events:none}
+  .pr.go{animation:pf 1.3s ease-out forwards}
+  @keyframes pf{0%{opacity:0.8;transform:translate(-50%,-50%) scale(0.3)}100%{opacity:0;transform:translate(-50%,-50%) scale(1.7)}}
+  .tags{position:absolute;bottom:12px;left:12px;right:12px;display:flex;gap:6px;flex-wrap:wrap}
+  .tag{background:rgba(0,229,255,0.08);border:1px solid rgba(0,229,255,0.22);color:var(--accent);font-size:10px;letter-spacing:1px;padding:3px 9px;border-radius:3px;text-transform:uppercase}
+
+  .ask-overlay{position:absolute;inset:0;background:rgba(0,20,10,0.75);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;opacity:0;transition:opacity 0.2s;pointer-events:none}
+  .ask-overlay.show{opacity:1}
+  .ask-title{font-family:'Syne',sans-serif;font-weight:800;font-size:26px;color:var(--green);letter-spacing:2px;text-shadow:0 0 24px rgba(0,255,136,0.9)}
+  .ask-sub{font-size:12px;color:rgba(0,255,136,0.7);letter-spacing:1px}
+  .ask-dots{display:flex;gap:10px;margin-top:4px}
+  .ad{width:12px;height:12px;border-radius:50%;background:var(--green);animation:bl 0.6s infinite}
+  .ad:nth-child(2){animation-delay:0.2s}.ad:nth-child(3){animation-delay:0.4s}
+
+  .resp{position:relative;z-index:10;background:rgba(13,26,34,0.97);border-top:1px solid var(--border);padding:12px 20px 10px;min-height:82px;max-height:128px;overflow-y:auto}
+  .rl{font-size:9px;letter-spacing:2px;color:var(--muted);text-transform:uppercase;margin-bottom:5px}
+  #rt{font-size:13px;line-height:1.7;color:var(--text);transition:color 0.3s}
+  #rt.sp{color:var(--accent)}
+  .wf{display:flex;align-items:center;gap:3px;height:16px;margin-top:6px;opacity:0;transition:opacity 0.3s}
+  .wf.on{opacity:1}
+  .wb{width:3px;background:var(--accent);border-radius:2px;min-height:3px;animation:wv 0.8s ease-in-out infinite}
+  .wb:nth-child(1){animation-delay:0s}.wb:nth-child(2){animation-delay:.1s}.wb:nth-child(3){animation-delay:.2s}
+  .wb:nth-child(4){animation-delay:.3s}.wb:nth-child(5){animation-delay:.15s}.wb:nth-child(6){animation-delay:.05s}.wb:nth-child(7){animation-delay:.25s}
+  @keyframes wv{0%,100%{height:3px}50%{height:14px}}
+
+  .controls{position:relative;z-index:10;display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;padding:12px 14px 18px;background:rgba(5,10,14,0.98);border-top:1px solid var(--border)}
+  .btn{display:flex;flex-direction:column;align-items:center;gap:5px;padding:12px 6px;border-radius:8px;border:1px solid var(--border);background:var(--surface);cursor:pointer;user-select:none;font-family:'Space Mono',monospace;font-size:9px;letter-spacing:1px;text-transform:uppercase;transition:all 0.15s}
+  .btn:active{transform:scale(0.93)}
+  .bi{font-size:20px}
+  .b-scan{border-color:var(--accent);color:var(--accent)}
+  .b-ask{border-color:var(--green);color:var(--green)}
+  .b-stop{border-color:var(--red);color:var(--red)}
+
+  .mbar{z-index:10;padding:9px 16px;background:rgba(5,10,14,0.98);font-size:10px;letter-spacing:1px;text-align:center;border-top:1px solid var(--border);transition:all 0.3s;color:var(--muted)}
+  .mbar.on{color:var(--green)}
+  .mbar.waiting{color:#fff;background:rgba(0,255,136,0.1)}
+  .mbar.err{color:var(--red)}
+</style>
+</head>
+<body>
+
+<!-- STEP 1: API Key -->
+<div class="setup" id="setup">
+  <div class="setup-logo">See<span>Path</span></div>
+  <div class="setup-sub">AI vision assistant for the visually impaired.<br/>Enter your Anthropic API key to begin.</div>
+  <input class="setup-input" id="api-input" type="password" placeholder="sk-ant-..." autocomplete="off"/>
+  <button class="setup-btn" onclick="submitKey()">NEXT →</button>
+  <div class="setup-note">Get a free key at console.anthropic.com<br/>Your key never leaves your device.</div>
+</div>
+
+<!-- STEP 2: Grant permissions -->
+<div class="perm" id="perm">
+  <div class="perm-icon">📷🎤</div>
+  <div class="perm-title">Allow Camera & Mic</div>
+  <div class="perm-sub">SeePath needs your camera to see<br/>and your microphone to hear commands.<br/><br/>Tap the button — then tap <b>Allow</b> when the browser asks.</div>
+  <button class="perm-btn" onclick="requestPermissions()">ALLOW CAMERA & MIC</button>
+  <div class="perm-err" id="perm-err"></div>
+</div>
+
+<header>
+  <div class="logo">See<span>Path</span></div>
+  <div class="pill"><div class="dot" id="dot"></div><span id="st">READY</span></div>
+</header>
+
+<div class="cam-wrap">
+  <video id="cam" autoplay playsinline muted></video>
+  <div class="ov">
+    <div class="bk tl"></div><div class="bk tr"></div><div class="bk bl2"></div><div class="bk br2"></div>
+    <div class="compass"><div class="cc"></div>
+      <span class="cl" style="top:9%;left:50%">12</span>
+      <span class="cl" style="top:50%;left:91%">3</span>
+      <span class="cl" style="top:91%;left:50%">6</span>
+      <span class="cl" style="top:50%;left:9%">9</span>
+    </div>
+    <div class="sl" id="sl"></div>
+    <div class="pr" id="pr"></div>
+    <div class="tags" id="tags"></div>
+    <div class="ask-overlay" id="ask-overlay">
+      <div class="ask-title">🎤 LISTENING</div>
+      <div class="ask-sub">Ask your question now</div>
+      <div class="ask-dots"><div class="ad"></div><div class="ad"></div><div class="ad"></div></div>
+    </div>
+  </div>
+</div>
+
+<div class="resp">
+  <div class="rl">AI · SeePath</div>
+  <div id="rt">Starting up...</div>
+  <div class="wf" id="wf"><div class="wb"></div><div class="wb"></div><div class="wb"></div><div class="wb"></div><div class="wb"></div><div class="wb"></div><div class="wb"></div></div>
+</div>
+
+<div class="controls">
+  <button class="btn b-scan" onclick="doScan()"><span class="bi">📷</span><span>SCAN</span></button>
+  <button class="btn b-ask"  onclick="enterAskMode()"><span class="bi">🎤</span><span>ASK</span></button>
+  <button class="btn b-stop" onclick="doStop()"><span class="bi">⏹</span><span>STOP</span></button>
+</div>
+<div class="mbar" id="mbar">Waiting for permissions...</div>
+
+<script>
+let APIKEY    = '';
+let camStream = null;
+let paused    = false;
+let busy      = false;
+let askMode   = false;
+let scanTimer = null;
+let mic       = null;
+let lastCmd   = '';
+
+const video      = document.getElementById('cam');
+const sl         = document.getElementById('sl');
+const pr         = document.getElementById('pr');
+const tagsEl     = document.getElementById('tags');
+const rt         = document.getElementById('rt');
+const wf         = document.getElementById('wf');
+const dot        = document.getElementById('dot');
+const stEl       = document.getElementById('st');
+const mbar       = document.getElementById('mbar');
+const askOverlay = document.getElementById('ask-overlay');
+
+// ── STEP 1: API key ───────────────────────────────────────
+function submitKey() {
+  const k = document.getElementById('api-input').value.trim();
+  if (!k.startsWith('sk-ant-') || k.length < 20) {
+    document.getElementById('api-input').style.borderColor = 'var(--red)';
+    document.getElementById('api-input').placeholder = 'Must start with sk-ant-...';
+    return;
+  }
+  APIKEY = k;
+  document.getElementById('setup').classList.add('hidden');
+  document.getElementById('perm').classList.add('show');
+}
+
+// ── STEP 2: Request BOTH permissions together ─────────────
+// Browser only grants mic if asked during a real user gesture (button tap)
+async function requestPermissions() {
+  const errEl = document.getElementById('perm-err');
+  errEl.classList.remove('show');
+
+  try {
+    // Request camera AND audio together — this is what makes mic work
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 } },
+      audio: true   // ← request audio here so browser asks for mic permission
+    });
+
+    // Split: video goes to camera, audio we immediately stop (we use SpeechRecognition not audio tracks)
+    camStream = stream;
+    video.srcObject = stream;
+
+    // Stop the audio track — we don't need it, SpeechRecognition handles its own mic
+    stream.getAudioTracks().forEach(t => t.stop());
+
+    document.getElementById('perm').classList.remove('show');
+    startApp();
+
+  } catch(e) {
+    let msg = '';
+    if (e.name === 'NotAllowedError') {
+      msg = '⚠ Permission denied. Go to your browser settings → Site Settings → Allow Camera and Microphone for this page, then reload.';
+    } else if (e.name === 'NotFoundError') {
+      msg = '⚠ No camera or mic found on this device.';
+    } else {
+      msg = '⚠ Error: ' + e.message;
+    }
+    errEl.textContent = msg;
+    errEl.classList.add('show');
+  }
+}
+
+// ── STEP 3: App starts ────────────────────────────────────
+function startApp() {
+  setStatus('LIVE', 'live');
+  say('SeePath ready. Say ask, stop, or start.');
+  startMic();
+  scanTimer = setInterval(doScan, 8000);
+  setTimeout(doScan, 2000);
+}
+
+// ── MIC — single instance, never stopped ─────────────────
+function startMic() {
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) {
+    mbar.textContent = '⚠ Voice requires Chrome browser';
+    mbar.className = 'mbar err';
+    return;
+  }
+
+  mic = new SR();
+  mic.continuous      = true;
+  mic.interimResults  = true;
+  mic.lang            = 'en-US';
+  mic.maxAlternatives = 3;
+
+  mic.onstart = () => {
+    mbar.textContent = '🎤 Say "ask" · "stop" · "start"';
+    mbar.className = 'mbar on';
+  };
+
+  mic.onresult = async (event) => {
+    for (let i = event.resultIndex; i < event.results.length; i++) {
+      const result = event.results[i];
+      const transcript = result[0].transcript.trim();
+      const t = transcript.toLowerCase();
+
+      // Show live in bottom bar so user knows mic works
+      mbar.textContent = (askMode ? "🎤 Heard: " : "💬 ") + transcript;
+
+      // STOP — no debounce, instant
+      if (t.includes("stop")) { doStop(); return; }
+
+      // START
+      if (t.includes("start") || t.includes("resume") || t.includes("continue")) { doStart(); return; }
+
+      // ASK — enter question mode (only on final result to avoid false triggers)
+      if ((t === 'ask' || t === 'question' || t.endsWith(' ask') || t.endsWith(' question')) && !askMode && result.isFinal) { enterAskMode(); return; }
+
+      // QUESTION — any final result while in ask mode
+      if (askMode && result.isFinal && transcript.length > 2 && !busy) {
+        exitAskMode();
+        setStatus("THINKING", "think");
+        rt.textContent = `"${transcript}"`;
+        const img = await capture();
+        await askClaude(img, transcript);
+        return;
+      }
+    }
+  };
+
+  mic.onerror = (e) => {
+    if (e.error === 'not-allowed') {
+      mbar.textContent = '⚠ Mic blocked — reload and tap Allow';
+      mbar.className = 'mbar err';
+      return;
+    }
+    if (e.error === 'no-speech' || e.error === 'aborted') return; // handled by onend
+    // Any other error: restart after short delay
+    setTimeout(() => { try { mic.start(); } catch(err) {} }, 800);
+  };
+
+  mic.onend = () => {
+    // Always restart — browser stops it after silence
+    setTimeout(() => { try { mic.start(); } catch(e) {} }, 200);
+  };
+
+  try {
+    mic.start();
+  } catch(e) {
+    mbar.textContent = '⚠ Could not start mic: ' + e.message;
+    mbar.className = 'mbar err';
+  }
+}
+
+// ── ask mode ──────────────────────────────────────────────
+function enterAskMode() {
+  if (busy) return;
+  askMode = true;
+  stopSpeech();
+  askOverlay.classList.add('show');
+  mbar.textContent = '🎤 Listening... speak your question!';
+  mbar.className = 'mbar waiting';
+  setStatus('LISTENING', 'ask');
+  navigator.vibrate && navigator.vibrate([80, 40, 80]);
+  setTimeout(() => { if (askMode) exitAskMode(); }, 10000);
+}
+
+function exitAskMode() {
+  askMode = false;
+  askOverlay.classList.remove('show');
+  mbar.textContent = '🎤 Say "ask" · "stop" · "start"';
+  mbar.className = 'mbar on';
+  if (!paused) setStatus('LIVE', 'live');
+}
+
+// ── commands ──────────────────────────────────────────────
+function doStop() {
+  stopSpeech();
+  paused = true;
+  askMode = false;
+  askOverlay.classList.remove('show');
+  clearInterval(scanTimer);
+  sl.classList.remove('on');
+  setStatus('PAUSED', '');
+  rt.textContent = 'Stopped. Say "start" to resume.';
+  mbar.textContent = '⏸ Paused — say "start" to resume';
+  mbar.className = 'mbar';
+  navigator.vibrate && navigator.vibrate([60, 40, 60]);
+}
+
+function doStart() {
+  if (!camStream) return;
+  paused = false;
+  clearInterval(scanTimer);
+  scanTimer = setInterval(doScan, 8000);
+  setStatus('LIVE', 'live');
+  mbar.textContent = '🎤 Say "ask" · "stop" · "start"';
+  mbar.className = 'mbar on';
+  navigator.vibrate && navigator.vibrate(70);
+  doScan();
+}
+
+// ── scan ──────────────────────────────────────────────────
+async function doScan() {
+  if (!camStream || paused || busy) return;
+  sl.classList.add('on');
+  pr.classList.remove('go'); void pr.offsetWidth; pr.classList.add('go');
+  navigator.vibrate && navigator.vibrate(50);
+  setStatus('SCANNING', 'live');
+  busy = true;
+  try {
+    const img  = await capture();
+    const text = await claudeCall(
+      img,
+      'You are SeePath for blind users. Describe the scene using clock directions (12=ahead,3=right,6=below,9=left). Max 50 words. Lead with most important object/hazard. Format: "There is a [object] at [N] o\'clock."',
+      'Describe this scene for a blind person.'
+    );
+    showTags(text);
+    say(text);
+  } catch(e) {
+    const msg = e.message.includes('401') ? 'Invalid API key. Please reload and re-enter your key.' :
+                e.message.includes('529') || e.message.includes('overloaded') ? 'AI busy, retrying soon.' :
+                'Scan error: ' + e.message;
+    say(msg);
+  }
+  busy = false;
+  sl.classList.remove('on');
+  if (!paused) setStatus('LIVE', 'live');
+}
+
+// ── ask claude ────────────────────────────────────────────
+async function askClaude(img, question) {
+  busy = true;
+  try {
+    const text = await claudeCall(
+      img,
+      'You are SeePath for blind users. Answer the question about what the camera sees. Use clock directions (12=ahead,3=right,6=below,9=left). Be direct, under 35 words.',
+      question
+    );
+    say(text);
+  } catch(e) { say('Error: ' + e.message); }
+  busy = false;
+  if (!paused) setStatus('LIVE', 'live');
+}
+
+// ── claude api ────────────────────────────────────────────
+async function claudeCall(img, system, userText) {
+  const res = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': APIKEY,
+      'anthropic-version': '2023-06-01',
+      'anthropic-dangerous-direct-browser-access': 'true'
+    },
+    body: JSON.stringify({
+      model: 'claude-sonnet-4-20250514',
+      max_tokens: 300,
+      system,
+      messages: [{ role: 'user', content: [
+        { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: img } },
+        { type: 'text', text: userText }
+      ]}]
+    })
+  });
+  const d = await res.json();
+  if (d.error) throw new Error(d.error.message);
+  return d.content?.[0]?.text || 'No response.';
+}
+
+// ── speech ────────────────────────────────────────────────
+function say(text) {
+  stopSpeech();
+  rt.textContent = text;
+  const u = new SpeechSynthesisUtterance(text);
+  u.rate = 1.05;
+  u.onstart = () => { rt.classList.add('sp'); wf.classList.add('on'); };
+  u.onend = u.onerror = () => { rt.classList.remove('sp'); wf.classList.remove('on'); };
+  window.speechSynthesis.speak(u);
+}
+
+function stopSpeech() {
+  window.speechSynthesis.cancel();
+  rt.classList.remove('sp');
+  wf.classList.remove('on');
+}
+
+// ── helpers ───────────────────────────────────────────────
+function setStatus(label, cls) { stEl.textContent = label; dot.className = 'dot ' + (cls||''); }
+
+async function capture() {
+  await new Promise(r => {
+    if (video.readyState >= 2 && video.videoWidth > 0) return r();
+    video.addEventListener('canplay', r, { once: true });
+  });
+  const c = document.createElement('canvas');
+  c.width = video.videoWidth || 640; c.height = video.videoHeight || 480;
+  c.getContext('2d').drawImage(video, 0, 0);
+  return new Promise((resolve, reject) => c.toBlob(b => {
+    if (!b) return reject(new Error('Camera frame capture failed'));
+    const f = new FileReader();
+    f.onload = () => resolve(f.result.split(',')[1]);
+    f.onerror = () => reject(new Error('Failed to read image data'));
+    f.readAsDataURL(b);
+  }, 'image/jpeg', 0.88));
+}
+
+const KNOWN = ['chair','table','door','person','people','bottle','phone','laptop','cup','bag','car','wall','window','desk','shelf','stair','step','couch','sofa','bed','counter'];
+function showTags(text) {
+  tagsEl.innerHTML = '';
+  [...new Set(KNOWN.filter(w => text.toLowerCase().includes(w)))].slice(0, 5).forEach(w => {
+    const e = document.createElement('div'); e.className = 'tag'; e.textContent = w; tagsEl.appendChild(e);
+  });
+}
+</script>
+</body>
+</html>
